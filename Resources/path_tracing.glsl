@@ -6,7 +6,7 @@ struct Material
     vec3 emmitance;
     vec3 reflectance;
     float roughness;
-    float refraction;
+    float opacity;
 };
 
 struct Box
@@ -39,24 +39,26 @@ uniform int uSamples;
 #define MAX_DEPTH 8
 #define SPHERE_COUNT 3
 #define BOX_COUNT 8
+#define N_IN 0.99
+#define N_OUT 1.0
 
 Sphere spheres[SPHERE_COUNT];
 Box boxes[BOX_COUNT];
 
 void InitializeScene()
 {
-    spheres[0].position = vec3(2.0, 1.5, -1.0);
+    spheres[0].position = vec3(2.5, 1.5, -1.5);
     spheres[1].position = vec3(-2.5, 2.5, -1.0);
-    spheres[2].position = vec3(1.5, -3.3, 3.0);
+    spheres[2].position = vec3(0.5, -4.0, 3.0);
     spheres[0].radius = 1.5;
     spheres[1].radius = 1.0;
-    spheres[2].radius = 1.7;
+    spheres[2].radius = 1.0;
     spheres[0].material.roughness = 1.0;
     spheres[1].material.roughness = 0.8;
     spheres[2].material.roughness = 1.0;
-    spheres[0].material.refraction = 0.0;
-    spheres[1].material.refraction = 0.0;
-    spheres[2].material.refraction = 0.8;
+    spheres[0].material.opacity = 0.0;
+    spheres[1].material.opacity = 0.0;
+    spheres[2].material.opacity = 0.8;
     spheres[0].material.reflectance = vec3(1.0, 0.0, 0.0);
     spheres[1].material.reflectance = vec3(1.0, 0.4, 0.0);
     spheres[2].material.reflectance = vec3(1.0, 1.0, 1.0);
@@ -78,7 +80,7 @@ void InitializeScene()
 
     // down
     boxes[1].material.roughness = 0.3;
-    boxes[1].material.refraction = 0.0;
+    boxes[1].material.opacity = 0.0;
     boxes[1].material.emmitance = vec3(0.0);
     boxes[1].material.reflectance = vec3(1.0, 1.0, 1.0);
     boxes[1].halfSize = vec3(5.0, 0.5, 5.0);
@@ -91,7 +93,7 @@ void InitializeScene()
 
     // right
     boxes[2].material.roughness = 0.0;
-    boxes[2].material.refraction = 0.0;
+    boxes[2].material.opacity = 0.0;
     boxes[2].material.emmitance = vec3(0.0);
     boxes[2].material.reflectance = vec3(0.0, 1.0, 0.0);
     boxes[2].halfSize = vec3(5.0, 0.5, 5.0);
@@ -104,7 +106,7 @@ void InitializeScene()
 
     // left
     boxes[3].material.roughness = 0.0;
-    boxes[3].material.refraction = 0.0;
+    boxes[3].material.opacity = 0.0;
     boxes[3].material.emmitance = vec3(0.0);
     boxes[3].material.reflectance = vec3(1.0, 0.0, 0.0);
     boxes[3].halfSize = vec3(5.0, 0.5, 5.0);
@@ -117,7 +119,7 @@ void InitializeScene()
 
     // back
     boxes[4].material.roughness = 0.0;
-    boxes[4].material.refraction = 0.0;
+    boxes[4].material.opacity = 0.0;
     boxes[4].material.emmitance = vec3(0.0);
     boxes[4].material.reflectance = vec3(1.0, 1.0, 1.0);
     boxes[4].halfSize = vec3(5.0, 0.5, 5.0);
@@ -130,8 +132,8 @@ void InitializeScene()
 
     // light source
     boxes[5].material.roughness = 0.0;
-    boxes[5].material.refraction = 0.0;
-    boxes[5].material.emmitance = vec3(12.0);
+    boxes[5].material.opacity = 0.0;
+    boxes[5].material.emmitance = vec3(6.0);
     boxes[5].material.reflectance = vec3(1.0);
     boxes[5].halfSize = vec3(2.5, 0.2, 2.5);
     boxes[5].position = vec3(0.0, 4.8, 0.0);
@@ -143,11 +145,11 @@ void InitializeScene()
 
     // boxes
     boxes[6].material.roughness = 0.0;
-    boxes[6].material.refraction = 0.0;
+    boxes[6].material.opacity = 0.0;
     boxes[6].material.emmitance = vec3(0.0);
     boxes[6].material.reflectance = vec3(1.0);
     boxes[6].halfSize = vec3(1.5, 3.0, 1.5);
-    boxes[6].position = vec3(-2.0, -2.0, -2.0);
+    boxes[6].position = vec3(-2.0, -2.0, -0.0);
     boxes[6].rotation = mat3(
         0.7, 0.0, 0.7,
         0.0, 1.0, 0.0,
@@ -155,11 +157,11 @@ void InitializeScene()
     );
     // boxes
     boxes[7].material.roughness = 0.0;
-    boxes[7].material.refraction = 0.0;
+    boxes[7].material.opacity = 0.0;
     boxes[7].material.emmitance = vec3(0.0);
     boxes[7].material.reflectance = vec3(1.0);
     boxes[7].halfSize = vec3(1.0, 1.5, 1.0);
-    boxes[7].position = vec3(2.5, -3.5, -2.0);
+    boxes[7].position = vec3(2.5, -3.5, -0.0);
     boxes[7].rotation = mat3(
         0.7, 0.0, 0.7,
         0.0, 1.0, 0.0,
@@ -317,6 +319,12 @@ bool CastRay(vec3 rayOrigin, vec3 rayDirection, out float fraction, out vec3 nor
     return minDistance != FAR_DISTANCE;
 }
 
+bool IsRefracted(float rand, vec3 direction, vec3 normal, float opacity, float nIn, float nOut)
+{
+    float fresnel = FresnelSchlick(nIn, nOut, direction, normal);
+    return opacity > rand && fresnel < rand;
+}
+
 vec3 TracePath(vec3 rayOrigin, vec3 rayDirection, float seed)
 {
     vec3 L = vec3(0.0);
@@ -332,33 +340,26 @@ vec3 TracePath(vec3 rayOrigin, vec3 rayDirection, float seed)
             vec3 newRayOrigin = rayOrigin + fraction * rayDirection;
 
             vec2 rand = vec2(RandomNoise(seed * TexCoord.xy), seed * RandomNoise(TexCoord.yx));
-            vec3 newRayDirection = RandomHemispherePoint(rand.xy, normal);
+            vec3 hemisphereDistributedDirection = RandomHemispherePoint(rand, normal);
 
             vec3 randomVec = vec3(
                 RandomNoise(sin(seed * TexCoord.xy)),
                 RandomNoise(cos(seed * TexCoord.xy)),
                 RandomNoise(sin(seed * TexCoord.yx))
             );
-            randomVec = 2.0 * randomVec - 1.0;
+            randomVec = normalize(2.0 * randomVec - 1.0);
 
             vec3 tangent = cross(randomVec, normal);
             vec3 bitangent = cross(normal, tangent);
-            mat3 tr = mat3(tangent, bitangent, normal);
+            mat3 transform = mat3(tangent, bitangent, normal);
 
-            newRayDirection = tr * newRayDirection;
-
-            const float nIn = 0.99;
-            const float nOut = 1.0;
-
-            float fresnel = FresnelSchlick(nIn, nOut, rayDirection, normal);
-
-            float refractionProbability = RandomNoise(cos(seed * TexCoord.yx));
-            bool refracted = material.refraction > refractionProbability &&
-                             fresnel < refractionProbability;
-
+            vec3 newRayDirection = transform * hemisphereDistributedDirection;
+            
+            float refractRand = RandomNoise(cos(seed * TexCoord.yx));
+            bool refracted = IsRefracted(refractRand, rayDirection, normal, material.opacity, N_IN, N_OUT);
             if (refracted)
             {
-                vec3 idealRefraction = IdealRefract(rayDirection, normal, nIn, nOut);
+                vec3 idealRefraction = IdealRefract(rayDirection, normal, N_IN, N_OUT);
                 newRayDirection = normalize(mix(-newRayDirection, idealRefraction, material.roughness));
                 newRayOrigin += normal * (dot(newRayDirection, normal) < 0.0 ? -0.8 : 0.8);
             }
@@ -368,6 +369,7 @@ vec3 TracePath(vec3 rayOrigin, vec3 rayDirection, float seed)
                 newRayDirection = normalize(mix(newRayDirection, idealReflection, material.roughness));
                 newRayOrigin += normal * 0.8;
             }
+
             rayDirection = newRayDirection;
             rayOrigin = newRayOrigin;
 
