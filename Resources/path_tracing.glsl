@@ -175,7 +175,7 @@ float RandomNoise(vec2 co)
     return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-vec3 RandomSpherePoint(vec2 rand)
+vec3 RandomHemispherePoint(vec2 rand)
 {
     float cosTheta = sqrt(1.0 - rand.x);
     float sinTheta = sqrt(rand.x);
@@ -187,9 +187,9 @@ vec3 RandomSpherePoint(vec2 rand)
     );
 }
 
-vec3 RandomHemispherePoint(vec2 rand, vec3 n)
+vec3 NormalOrientedHemispherePoint(vec2 rand, vec3 n)
 {
-    vec3 v = RandomSpherePoint(rand);
+    vec3 v = RandomHemispherePoint(rand);
     return dot(v, n) < 0.0 ? -v : v;
 }
 
@@ -340,7 +340,7 @@ vec3 TracePath(vec3 rayOrigin, vec3 rayDirection, float seed)
             vec3 newRayOrigin = rayOrigin + fraction * rayDirection;
 
             vec2 rand = vec2(RandomNoise(seed * TexCoord.xy), seed * RandomNoise(TexCoord.yx));
-            vec3 hemisphereDistributedDirection = RandomHemispherePoint(rand, normal);
+            vec3 hemisphereDistributedDirection = NormalOrientedHemispherePoint(rand, normal);
 
             vec3 randomVec = vec3(
                 RandomNoise(sin(seed * TexCoord.xy)),
